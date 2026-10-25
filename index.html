@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      name="description"
+      content="Локальная обработка 3D-сканов: сглаживание, кисть, упрощение и экспорт."
+    />
+    <title>Mesh Scan Studio</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">M</div>
+          <div>
+            <strong>Mesh Scan Studio</strong
+            ><small>локальная обработка 3D-сканов</small>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button
+            id="openBtn"
+            class="button secondary"
+            title="Открыть модель (Ctrl+O)"
+          >
+            Открыть</button
+          ><select
+            id="exportFormat"
+            class="export-select"
+            aria-label="Формат экспорта"
+            disabled
+          >
+            <option value="stl">STL binary</option>
+            <option value="obj">OBJ</option>
+            <option value="ply">PLY ASCII</option></select
+          ><button
+            id="saveBtn"
+            class="button primary"
+            disabled
+            title="Сохранить копию (Ctrl+S)"
+          >
+            Сохранить копию</button
+          ><input
+            id="fileInput"
+            type="file"
+            accept=".stl,.obj,.ply,.off,.gltf,.glb,.bin,model/stl,model/ply,model/gltf-binary,model/gltf+json,text/plain,application/json"
+            multiple
+            hidden
+          />
+        </div>
+      </header>
+      <main class="layout">
+        <aside class="sidebar">
+          <section class="side-head">
+            <span class="eyebrow">РАБОЧАЯ ОБЛАСТЬ</span>
+            <h1>Обработка модели</h1>
+            <p>
+              Изменения остаются на этом компьютере. Исходный файл не
+              перезаписывается.
+            </p>
+          </section>
+          <div class="file-card">
+            <div class="file-icon">3D</div>
+            <div class="file-meta">
+              <strong id="fileName">Модель не открыта</strong
+              ><span id="fileFormat"
+                >Откройте STL, OBJ, PLY, OFF, glTF или GLB</span
+              >
+            </div>
+            <button
+              id="resetBtn"
+              class="icon-button"
+              disabled
+              title="Сбросить изменения"
+            >
+              ↺
+            </button>
+          </div>
+          <section class="stats-grid">
+            <div><span>ВЕРШИНЫ</span><strong id="vertices">—</strong></div>
+            <div><span>ТРЕУГОЛЬНИКИ</span><strong id="faces">—</strong></div>
+            <div class="wide">
+              <span>ГАБАРИТЫ · ЕДИНИЦЫ НЕ УКАЗАНЫ</span
+              ><strong id="dimensions">—</strong>
+            </div>
+          </section>
+          <div class="history-row">
+            <button
+              id="undoBtn"
+              class="button small"
+              disabled
+              title="Отменить (Ctrl+Z)"
+            >
+              ↶ Отменить</button
+            ><button
+              id="redoBtn"
+              class="button small"
+              disabled
+              title="Повторить (Ctrl+Y)"
+            >
+              ↷ Повторить</button
+            ><span id="historyLabel">История пуста</span>
+          </div>
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="smooth">Сглаживание</button
+            ><button class="tab" data-tab="brush">Кисть</button
+            ><button class="tab" data-tab="reduce">Упростить</button>
+          </div>
+          <section id="panel-smooth" class="tool-panel">
+            <div class="tool-title">
+              <div class="tool-icon">≈</div>
+              <div>
+                <h2>Глобальное сглаживание</h2>
+                <p>Слегка выравнивает поверхность</p>
+              </div>
+            </div>
+            <label class="range-label" for="smoothStrength"
+              ><span>Сила</span><b id="strengthValue">45%</b></label
+            ><input
+              id="smoothStrength"
+              type="range"
+              min="5"
+              max="90"
+              value="45"
+              title="Сильнее сглаживание может стереть мелкие детали"
+            />
+            <div class="range-ends">
+              <span>Слабое</span><span>Сильное</span>
+            </div>
+            <label class="field-label" for="iterations"
+              >Проходы
+              <span>Больше проходов — заметнее сглаживание</span></label
+            >
+            <div class="stepper">
+              <button data-step="-1" data-target="iterations">−</button
+              ><input
+                id="iterations"
+                type="number"
+                min="1"
+                max="12"
+                value="3"
+              /><button data-step="1" data-target="iterations">+</button>
+            </div>
+            <label class="check-row"
+              ><input id="preserveBoundary" type="checkbox" checked /><span
+                >Защищать открытые края</span
+              ></label
+            >
+            <p class="hint">
+              Алгоритм Taubin уменьшает шум с умеренной усадкой. Операцию можно
+              отменить.
+            </p>
+            <button id="smoothBtn" class="button primary full" disabled>
+              Сгладить модель
+            </button>
+          </section>
+          <section id="panel-brush" class="tool-panel hidden">
+            <div class="tool-title">
+              <div class="tool-icon blue">✳</div>
+              <div>
+                <h2>Сглаживание кистью</h2>
+                <p>Включите режим и нажимайте на поверхность</p>
+              </div>
+            </div>
+            <label class="range-label" for="brushRadius"
+              ><span>Радиус кисти</span><b id="radiusValue">12%</b></label
+            ><input id="brushRadius" type="range" min="2" max="35" value="12" />
+            <div class="range-ends"><span>Меньше</span><span>Больше</span></div>
+            <label class="range-label" for="brushStrength"
+              ><span>Интенсивность</span
+              ><b id="brushStrengthValue">40%</b></label
+            ><input
+              id="brushStrength"
+              type="range"
+              min="5"
+              max="80"
+              value="40"
+            /><label class="check-row"
+              ><input id="brushBoundary" type="checkbox" checked /><span
+                >Защищать открытые края</span
+              ></label
+            ><button id="brushToggle" class="button outline full" disabled>
+              Включить кисть
+            </button>
+            <p class="hint">
+              Кисть затухает к краю круга. При движении обрабатывается видимая
+              поверхность вокруг точки. Один мазок — одно действие отмены.
+            </p>
+          </section>
+          <section id="panel-reduce" class="tool-panel hidden">
+            <div class="tool-title">
+              <div class="tool-icon purple">▽</div>
+              <div>
+                <h2>Упрощение сетки</h2>
+                <p>Меньше треугольников — легче файл</p>
+              </div>
+            </div>
+            <label class="range-label" for="reducePercent"
+              ><span>Сократить полигоны</span><b id="reduceValue">30%</b></label
+            ><input
+              id="reducePercent"
+              type="range"
+              min="5"
+              max="90"
+              value="30"
+            />
+            <label class="field-label" for="minAngle"
+              >Диапазон угла изменения нормали
+              <span
+                >Объединять близкие вершины в указанном диапазоне</span
+              ></label
+            >
+            <div class="angle-range">
+              <label
+                >От
+                <input id="minAngle" type="number" min="0" max="180" value="0"
+              /></label>
+              <span>°</span>
+              <label
+                >До
+                <input id="maxAngle" type="number" min="0" max="180" value="30"
+              /></label>
+              <span>°</span>
+            </div>
+            <div class="estimate">
+              <span>Сейчас</span><b id="currentFaces">—</b
+              ><span>Цель примерно</span><b id="targetFaces">—</b>
+            </div>
+            <p class="hint warning">
+              Упрощение приблизительное: близкие вершины объединяются только в
+              диапазоне изменения нормали. Геометрия может измениться; сравните
+              результат с исходником.
+            </p>
+            <button id="reduceBtn" class="button primary full" disabled>
+              Упростить сетку
+            </button>
+          </section>
+          <section class="compare-card">
+            <div>
+              <strong>Сравнить до / после</strong
+              ><span>Переключает исходную и текущую модель</span>
+            </div>
+            <label class="switch"
+              ><input id="compareToggle" type="checkbox" disabled /><span></span
+            ></label>
+          </section>
+          <div id="notice" class="notice hidden" role="status"></div>
+          <div class="sidebar-foot">
+            <span class="privacy-dot"></span>Файлы остаются на устройстве
+          </div>
+        </aside>
+        <section class="viewport">
+          <div class="viewport-bar">
+            <div class="view-label">
+              <span class="live-dot"></span
+              ><span id="viewStatus">Ожидание модели</span>
+            </div>
+            <div class="view-tools">
+              <select id="displayMode" aria-label="Режим отображения">
+                <option value="solid">Затенение</option>
+                <option value="wire">Каркас</option></select
+              ><button
+                id="gridToggle"
+                class="view-btn active"
+                title="Показать или скрыть сетку"
+              >
+                Сетка</button
+              ><button
+                id="fitBtn"
+                class="view-btn"
+                title="Вписать модель в окно"
+              >
+                Вписать</button
+              ><button
+                id="resetViewBtn"
+                class="view-btn"
+                title="Сбросить ракурс"
+              >
+                Сброс вида
+              </button>
+            </div>
+          </div>
+          <div class="canvas-wrap">
+            <canvas id="canvas" aria-label="Интерактивная 3D-сцена"></canvas>
+            <div id="brushCursor" class="brush-cursor hidden"></div>
+            <div id="progressOverlay" class="progress-overlay hidden">
+              <div class="progress-card">
+                <div class="spinner"></div>
+                <strong id="progressLabel">Обработка модели…</strong
+                ><span>Геометрия обрабатывается локально в фоновом потоке.</span
+                ><button id="cancelOperationBtn" class="button secondary">
+                  Отменить операцию
+                </button>
+              </div>
+            </div>
+            <div id="welcome" class="welcome">
+              <div class="welcome-art">
+                <div class="cube-face front">3D</div>
+                <div class="cube-face side"></div>
+                <div class="cube-face top"></div>
+              </div>
+              <span class="eyebrow">MESH SCAN STUDIO · MVP</span>
+              <h2>Подготовьте скан к работе</h2>
+              <p>
+                Откройте локальную модель или попробуйте демонстрационный скан.
+                Никакие данные не отправляются в сеть.
+              </p>
+              <div class="welcome-actions">
+                <button id="welcomeOpen" class="button primary">
+                  Открыть модель</button
+                ><button id="exampleBtn" class="button secondary">
+                  Открыть пример
+                </button>
+              </div>
+              <div class="supported">
+                STL · OBJ · PLY (включая облако точек) · OFF · glTF · GLB
+                <span>•</span> экспорт STL/OBJ/PLY
+              </div>
+            </div>
+            <div class="canvas-hint">
+              <span>ЛКМ вращение</span><span>ПКМ панорама</span
+              ><span>Колесо масштаб</span
+              ><span id="brushHint" class="hidden"
+                >Кисть: нажмите и ведите по поверхности</span
+              >
+            </div>
+          </div>
+          <footer class="statusbar">
+            <span id="statusText">Готово к работе</span
+            ><span id="meshDiagnostics">—</span>
+          </footer>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
